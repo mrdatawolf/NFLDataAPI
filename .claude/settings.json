@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsx *)",
+      "Bash(break)",
+      "Bash(ps -o pid,ppid,%cpu,%mem,cmd -p 703862,704010)",
+      "Bash(curl -s -X POST http://localhost:7300/api/ingest/scan?source=raptor -o /tmp/claude-1000/-home-patrick-Documents-Github-NFLDataAPI/8de82d8e-52e9-4710-a16a-1adec045bea2/scratchpad/fresh_scan_result.json -w '%{http_code}\\\\n')"
+    ]
+  }
+}
