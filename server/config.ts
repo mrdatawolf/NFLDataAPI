@@ -28,6 +28,7 @@ export const config = {
   port: Number(process.env.APIPORT || 3002),
   host: process.env.HOST || '0.0.0.0',
   dbPath: process.env.DB_PATH || './data/bronze.db',
+  bronzeLimitDefault: Number(process.env.BRONZE_LIMIT_DEFAULT || 1000),
   scanIntervalHours: Number(process.env.SCAN_INTERVAL_HOURS || 1),
   scanOnStart: process.env.SCAN_ON_START !== 'false',
   sources: [readSource('raptor'), readSource('sawfilers'), readSource('porter')]
