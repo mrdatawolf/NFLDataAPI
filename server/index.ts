@@ -92,7 +92,7 @@ app.get('/api/bronze/:source/:table', async (req, res) => {
     return;
   }
 
-  const limit = Math.min(Number(req.query.limit || 100), 1000);
+  const limit = Math.min(Number(req.query.limit || config.bronzeLimitDefault), 10000);
   const offset = Number(req.query.offset || 0);
   const result = await db.query(
     `SELECT id, payload, batch_id, ingested_at FROM bronze."${landing}" ORDER BY id DESC LIMIT $1 OFFSET $2`,
@@ -156,7 +156,7 @@ const swaggerDocument = {
         parameters: [
           { name: 'source', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'table', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'limit', in: 'query', schema: { type: 'integer', default: 100, maximum: 1000 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: config.bronzeLimitDefault, maximum: 10000 } },
           { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } }
         ],
         responses: { '200': { description: 'Raw rows (payload JSONB + lineage columns)' }, '404': { description: 'Unknown bronze table' } }
