@@ -87,7 +87,7 @@ if "!HEALTH_CODE!"=="200" (
 )
 set /a TRIES+=1
 if !TRIES! GEQ 60 (
-  echo WARNING: server did not report healthy within 60s. It may still be starting ^(e.g. running the initial ingest^) - check the NFLDataAPI window for errors.
+  echo WARNING: server did not report healthy within 60s. Check the NFLDataAPI window for errors.
   goto done
 )
 timeout /t 1 >nul

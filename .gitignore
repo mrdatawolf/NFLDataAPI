@@ -7,3 +7,4 @@ data/
 # Source database clones (production data - never commit)
 Examples/*
 !Examples/README.md
+.claude/*

@@ -106,7 +106,7 @@ if command -v curl >/dev/null 2>&1; then
     sleep 1
   done
   if [ "$HEALTHY" -eq 0 ]; then
-    echo "WARNING: server did not report healthy within 60s. It may still be starting (e.g. running the initial ingest) - check above for errors."
+    echo "WARNING: server did not report healthy within 60s. Check above for errors."
   fi
 fi
 

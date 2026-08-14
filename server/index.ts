@@ -3,14 +3,11 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import swaggerUi from 'swagger-ui-express';
-import { config, sourceAvailable } from './config.js';
-import { db, initDb, listLandingTables, landingTableName } from './db.js';
-import { scanAllSources } from './ingest.js';
+import { config } from './config.js';
+import { db, listLandingTables, landingTableName } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-await initDb();
 
 const app = express();
 app.use(cors());
@@ -27,25 +24,13 @@ app.get('/api/sources', async (_req, res) => {
     ORDER BY source, id DESC;
   `);
 
-  res.json({
-    sources: config.sources.map((source) => ({
-      name: source.name,
-      type: source.type,
-      path: source.path || null,
-      configured: source.configured,
-      available: sourceAvailable(source),
-      last_run: lastRuns.rows.find((run) => run.source === source.name) ?? null
-    }))
-  });
+  res.json({ sources: lastRuns.rows.map((run) => ({ name: run.source, last_run: run })) });
 });
 
 app.get('/api/summary', async (_req, res) => {
   const tables = await listLandingTables();
   const bySource: Record<string, { tables: number; rows: number }> = {};
 
-  for (const source of config.sources) {
-    bySource[source.name] = { tables: 0, rows: 0 };
-  }
   for (const table of tables) {
     const sourceName = table.table_name.split('__')[0];
     bySource[sourceName] ??= { tables: 0, rows: 0 };
@@ -58,16 +43,6 @@ app.get('/api/summary', async (_req, res) => {
     total_tables: tables.length,
     by_source: bySource
   });
-});
-
-app.post('/api/ingest/scan', async (req, res) => {
-  try {
-    const only = typeof req.query.source === 'string' ? req.query.source : undefined;
-    const results = await scanAllSources(only);
-    res.json({ results });
-  } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Scan failed' });
-  }
 });
 
 app.get('/api/ingest/runs', async (req, res) => {
@@ -107,7 +82,7 @@ const swaggerDocument = {
     title: 'NFLDataAPI',
     version: '0.1.0',
     description:
-      'Unified mill-data API. Ingests disparate vendor databases (Raptor, Saw Filers, Porter) into a bronze layer in PGlite and serves the raw data.'
+      'Unified mill-data API. Reads the bronze layer (Raptor, Saw Filers, Porter, Tally) landed by the sibling NFLETL project and serves the raw data. This repo does not ingest anything itself.'
   },
   paths: {
     '/health': {
@@ -118,7 +93,7 @@ const swaggerDocument = {
     },
     '/api/sources': {
       get: {
-        summary: 'Configured sources, availability, and their last ingest run',
+        summary: 'Sources seen in bronze ingest history and their last run',
         responses: { '200': { description: 'Source list' } }
       }
     },
@@ -128,18 +103,9 @@ const swaggerDocument = {
         responses: { '200': { description: 'Summary counts' } }
       }
     },
-    '/api/ingest/scan': {
-      post: {
-        summary: 'Ingest all configured sources into bronze (or one source via ?source=)',
-        parameters: [
-          { name: 'source', in: 'query', schema: { type: 'string', enum: ['raptor', 'sawfilers', 'porter'] }, description: 'Only scan this source' }
-        ],
-        responses: { '200': { description: 'Per-source scan results' }, '500': { description: 'Scan failed or already in progress' } }
-      }
-    },
     '/api/ingest/runs': {
       get: {
-        summary: 'Ingest run history',
+        summary: 'Ingest run history (written by NFLETL)',
         parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } }],
         responses: { '200': { description: 'Recent runs, newest first' } }
       }
@@ -176,15 +142,3 @@ app.get('*', (_req, res) => {
 app.listen(config.port, config.host, () => {
   console.log(`Server listening on http://${config.host}:${config.port}`);
 });
-
-if (config.scanOnStart) {
-  scanAllSources()
-    .then((results) => console.log('Initial scan complete', results))
-    .catch((error) => console.error('Initial scan failed', error));
-}
-
-if (config.scanIntervalHours > 0) {
-  setInterval(() => {
-    scanAllSources().catch((error) => console.error('Scheduled scan failed', error));
-  }, config.scanIntervalHours * 60 * 60 * 1000);
-}
