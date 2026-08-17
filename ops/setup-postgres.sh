@@ -8,23 +8,37 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Export the dotenv values for this process. Values containing #, spaces, or
-# shell metacharacters must be quoted in .env (for example PGPASSWORD='abc#123').
-set -a
-# shellcheck disable=SC1091
-source .env
-set +a
+# Read only the keys needed for provisioning. Do not `source .env`: dotenv
+# permits values that are not valid shell syntax, and a sourced file could
+# execute arbitrary commands. The final definition of a repeated key wins.
+read_dotenv_value() {
+  local key=$1 line value=''
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    if [[ $line == "$key="* ]]; then
+      value=${line#*=}
+    fi
+  done < .env
 
-: "${PGUSER:?PGUSER must be set in .env}"
-: "${PGPASSWORD:?PGPASSWORD must be set in .env}"
-: "${BRONZE_PGDATABASE:?BRONZE_PGDATABASE must be set in .env}"
-: "${SILVER_PGDATABASE:?SILVER_PGDATABASE must be set in .env}"
+  if [[ $value == \"*\" && $value == *\" ]]; then
+    value=${value:1:${#value}-2}
+  elif [[ $value == \'*\' && $value == *\' ]]; then
+    value=${value:1:${#value}-2}
+  fi
+  printf '%s' "$value"
+}
 
-API_USER=$PGUSER
-API_PASSWORD=$PGPASSWORD
-BRONZE_DATABASE=$BRONZE_PGDATABASE
-SILVER_DATABASE=$SILVER_PGDATABASE
-BRONZE_OWNER=${BRONZE_PGOWNER:-nfletl}
+API_USER=$(read_dotenv_value PGUSER)
+API_PASSWORD=$(read_dotenv_value PGPASSWORD)
+BRONZE_DATABASE=$(read_dotenv_value BRONZE_PGDATABASE)
+SILVER_DATABASE=$(read_dotenv_value SILVER_PGDATABASE)
+BRONZE_OWNER=$(read_dotenv_value BRONZE_PGOWNER)
+BRONZE_OWNER=${BRONZE_OWNER:-nfletl}
+
+: "${API_USER:?PGUSER must be set in .env}"
+: "${API_PASSWORD:?PGPASSWORD must be set in .env}"
+: "${BRONZE_DATABASE:?BRONZE_PGDATABASE must be set in .env}"
+: "${SILVER_DATABASE:?SILVER_PGDATABASE must be set in .env}"
 
 # The setup connection is made as the local postgres administrator. Remove the
 # application's PG* connection variables so they cannot redirect that admin

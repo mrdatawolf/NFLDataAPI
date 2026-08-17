@@ -31,8 +31,9 @@ BRONZE_PGDATABASE=bronze
 SILVER_PGDATABASE=silver
 ```
 
-Quote `PGPASSWORD` when it contains `#`, spaces, or shell metacharacters. Keep
-`.env` uncommitted.
+Quotes around `PGPASSWORD` are recommended when it contains `#`, spaces, or
+shell metacharacters. The wrapper reads only the required PostgreSQL keys and
+does not execute or source `.env`. Keep `.env` uncommitted.
 
 ## Automated local setup
 
