@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import swaggerUi from 'swagger-ui-express';
 import { config } from './config.js';
-import { db, listLandingTables, landingTableName } from './db.js';
+import { db, initDb, listLandingTables, landingTableName } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -138,6 +138,8 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
+
+await initDb();
 
 app.listen(config.port, config.host, () => {
   console.log(`Server listening on http://${config.host}:${config.port}`);

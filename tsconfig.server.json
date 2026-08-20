@@ -11,5 +11,10 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["server/**/*.ts"]
+  "include": ["server/**/*.ts"],
+  "exclude": [
+    "server/ingest.ts",
+    "server/mock/**",
+    "server/sources/**"
+  ]
 }

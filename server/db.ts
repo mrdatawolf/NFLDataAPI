@@ -1,12 +1,23 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
+import { Pool } from 'pg';
 import { config } from './config.js';
 
-// Read-only consumer of the bronze database. Schema creation and all writes
-// happen in the sibling NFLETL repo — this process only queries it.
-fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
-export const db = new PGlite(config.dbPath);
+// Read-only consumer of the bronze database. PostgreSQL grants enforce that
+// schema creation and all writes remain owned by the sibling NFLETL service.
+export const db = new Pool(config.bronze);
+
+export async function initDb(): Promise<void> {
+  try {
+    await db.query('SELECT 1');
+  } catch (error) {
+    await db.end().catch(() => undefined);
+    const target = `${config.bronze.host}:${config.bronze.port}/${config.bronze.database}`;
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Unable to connect to PostgreSQL at ${target} as ${config.bronze.user}: ${reason}`,
+      { cause: error }
+    );
+  }
+}
 
 // Landing tables are one-per-source-table, named bronze.<source>__<table>.
 export function landingTableName(source: string, table: string): string {
