@@ -4,6 +4,7 @@ import { config } from './config.js';
 // Read-only consumer of the bronze database. PostgreSQL grants enforce that
 // schema creation and all writes remain owned by the sibling NFLETL service.
 export const db = new Pool(config.bronze);
+export const silverDb = new Pool(config.silver);
 
 export async function initDb(): Promise<void> {
   try {

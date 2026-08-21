@@ -8,6 +8,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite --config client/vite.config.ts",
     "build": "tsc -p tsconfig.server.json && vite --config client/vite.config.ts build",
+    "transform:silver": "tsx server/transform.ts",
     "start": "node dist/index.js"
   },
   "dependencies": {

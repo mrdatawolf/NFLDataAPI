@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
--- Initial typed silver models based on the live Porter and Tally bronze
--- payloads observed on 2026-08-17. Every table retains bronze lineage so a
+-- Typed silver models based on the live Porter and normalized five-table
+-- Tally bronze payloads. Every table retains bronze lineage so a
 -- row can be traced back or safely upserted after another ingestion run.
 
 CREATE SCHEMA IF NOT EXISTS silver;
@@ -201,7 +201,13 @@ CREATE TABLE IF NOT EXISTS silver.transform_runs (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   finished_at TIMESTAMPTZ,
+  source TEXT NOT NULL DEFAULT 'all',
   status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'error')),
   rows_upserted INTEGER NOT NULL DEFAULT 0,
+  rows_skipped INTEGER NOT NULL DEFAULT 0,
   error TEXT
 );
+
+-- Upgrade databases created by the initial version of this schema.
+ALTER TABLE silver.transform_runs ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'all';
+ALTER TABLE silver.transform_runs ADD COLUMN IF NOT EXISTS rows_skipped INTEGER NOT NULL DEFAULT 0;

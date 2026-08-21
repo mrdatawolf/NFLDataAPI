@@ -1,73 +1,78 @@
 # NFLDataAPI
 
-Read-only REST API + small React viewer over a unified mill-data bronze
-layer (production/tally, downtime/machine status, and maintenance/saw
-records) in PGlite. This repo does not ingest anything — all ingestion
-(Raptor, Saw Filers, Porter) and tally-report parsing lives in the sibling
-[NFLETL](https://github.com/mrdatawolf/NFLETL) project, which writes the same
-bronze PGlite database this repo reads.
+REST API and React viewer for the mill-data platform. The application reads
+raw bronze data landed by the sibling
+[NFLETL](https://github.com/mrdatawolf/NFLETL) service and owns the typed
+silver layer. Both layers now run on PostgreSQL 17; PGlite is no longer used.
 
-## Architecture (medallion)
+## Architecture
 
-- One PGlite database (`DB_PATH`) with a `bronze` schema, owned by NFLETL.
-  **`DB_PATH` here must resolve to the same directory as NFLETL's `DB_PATH`**
-  — this app opens that directory read-only.
-- Each source table lands in `bronze.<source>__<table>` (e.g.
-  `bronze.sawfilers__benching`) as raw JSONB payloads with lineage columns:
-  `source`, `source_table`, `batch_id`, `ingested_at`, `row_hash`.
-- **Silver** (conformed models unifying production, downtime, and maintenance
-  across vendors) and **gold** (serving/aggregate views) are deliberately
-  deferred until all real schemas are visible side by side.
+| Database | Owner | Purpose |
+| --- | --- | --- |
+| `bronze` | NFLETL | Append-only JSONB landing tables and ingestion lineage. NFLDataAPI has `SELECT` access only. |
+| `silver` | NFLDataAPI | Typed, cleaned models populated by this repository. |
 
-### Known risk: concurrent access to bronze.db
+Each bronze source table is named `bronze.<source>__<table>` and contains a
+raw `payload` plus `source`, `source_table`, `row_hash`, `batch_id`, and
+`ingested_at` lineage columns. PostgreSQL provides safe concurrent access for
+the NFLETL writer and API/transform readers.
 
-PGlite isn't built for multi-process concurrent access the way WAL-mode
-SQLite or a real Postgres server is. NFLETL (writer) and this app (reader)
-are separate processes opening the same PGlite data directory — a scan
-running in NFLETL at the same moment this app is serving a request could hit
-lock contention. Untested under load; worth watching if errors show up
-during NFLETL scan windows.
+Tally is a normalized five-table report feed rather than the same shape as
+Porter's production tally. Its `files`, `summary`, `detail_lines`,
+`reject_reasons`, and `solutions` records are joined by `file_id` and load to
+matching typed silver tables. The transform maps reject `count` to
+`reject_count`, converts duration strings to PostgreSQL intervals, retains
+bronze lineage, and safely upserts repeat runs.
 
-## Running locally
+## Setup and running
 
-1. `npm install`
-2. Copy `.env.example` to `.env` and point `DB_PATH` at the same bronze
-   directory NFLETL writes to.
-3. Run NFLETL at least once (see its README) so the bronze schema and some
-   data exist — this app doesn't create anything itself.
-4. `npm run dev`
-   - UI: http://localhost:7301 (Vite dev, `DEVPORT`)
-   - API + Swagger docs: http://localhost:7300/api/docs (`APIPORT`)
+1. Install PostgreSQL 17 and run NFLETL's bronze setup/ingestion.
+2. Copy `.env.example` to `.env` and set the PostgreSQL connection values.
+3. Run `./ops/setup-postgres.sh` to create/grant the application role and
+   create the silver database/schema. See [SetupPG.md](SetupPG.md).
+4. Run `npm install` and `npm run dev`.
 
-Or use `./start.sh` / `start.bat`, which checks prerequisites, builds, and
-launches the production build (single process serving API + client on
-`APIPORT`).
+The UI defaults to http://localhost:7301 and the API/Swagger UI to
+http://localhost:7300/api/docs. `./start.sh` and `start.bat` build and launch
+the production server.
+
+## Silver ingestion
+
+After NFLETL lands a Tally batch, run:
+
+```bash
+npm run transform:silver
+```
+
+The command reads bronze through the read-only pool and writes to the separate
+silver pool. It processes all Tally rows idempotently, reports upsert/skipped
+counts, and records each attempt in `silver.transform_runs`. Re-run
+`ops/silver-schema.sql` before the transform when deploying schema changes.
 
 ## API
 
 | Endpoint | Description |
 | --- | --- |
 | `GET /health` | Health check |
-| `GET /api/sources` | Sources seen in bronze ingest history and their last run |
-| `GET /api/summary` | Bronze row/table counts per source |
-| `GET /api/ingest/runs` | Ingest run history (written by NFLETL) |
-| `GET /api/bronze/tables` | List bronze landing tables with counts |
-| `GET /api/bronze/{source}/{table}` | Browse raw landed rows (paginated) |
+| `GET /api/sources` | Sources and their latest bronze ingestion run |
+| `GET /api/summary` | Bronze row/table counts by source |
+| `GET /api/ingest/runs` | NFLETL bronze ingestion history |
+| `GET /api/bronze/tables` | Bronze landing tables and counts |
+| `GET /api/bronze/{source}/{table}` | Paginated raw bronze rows |
 | `GET /api/docs` | Swagger UI |
 
-## Layout
+## Repository layout
 
-```
-server/            Express API (read-only)
-  config.ts        env parsing
-  db.ts            bronze PGlite connection + read helpers
-client/            React 18 + Vite viewer (summary, bronze browser)
-data/              gitignored — the bronze PGlite directory (or a symlink/mount to NFLETL's)
+```text
+server/                 Express API and bronze-to-silver transform
+client/                 React/Vite viewer
+ops/silver-schema.sql   Idempotent typed silver DDL
+ops/setup-postgres.*    PostgreSQL provisioning
 ```
 
 ## Production build
 
-```
+```bash
 npm run build
 npm start
 ```

@@ -12,5 +12,12 @@ export const config = {
     password: process.env.PGPASSWORD,
     database: process.env.BRONZE_PGDATABASE || 'bronze'
   },
+  silver: {
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || 5432),
+    user: process.env.PGUSER || 'nfldataapi',
+    password: process.env.PGPASSWORD,
+    database: process.env.SILVER_PGDATABASE || 'silver'
+  },
   bronzeLimitDefault: Number(process.env.BRONZE_LIMIT_DEFAULT || 1000)
 };

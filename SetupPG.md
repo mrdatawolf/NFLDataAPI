@@ -76,6 +76,21 @@ The same login connects to both databases, but the
 application uses a separate connection pool for each one because PostgreSQL
 connections cannot switch databases.
 
+## Load Tally into silver
+
+After NFLETL completes a Tally bronze ingestion, apply any updated silver DDL
+and run the idempotent transform:
+
+```bash
+PGPASSWORD='your-password' psql -h localhost -U nfldataapi -d silver \
+  --file=ops/silver-schema.sql
+npm run transform:silver
+```
+
+Tally arrives as five related tables keyed by `file_id`; it is not loaded
+into the Porter-oriented `production_tallies` table. Transform attempts and
+row counts are recorded in `silver.transform_runs`.
+
 ## Verification
 
 ```bash
